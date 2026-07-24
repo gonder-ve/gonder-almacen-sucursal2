@@ -1,0 +1,32 @@
+{
+  "name": "GONDER Sucursal 2 Almacén",
+  "short_name": "GONDER Suc.2",
+  "description": "App de almacén para escanear y validar albaranes de entrega de GONDER LISANDRO ALVARADO 2",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2C200",
+  "theme_color": "#F2C200",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
