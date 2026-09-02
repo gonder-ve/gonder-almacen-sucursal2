@@ -86,6 +86,14 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 #scanner-container video{width:100%!important;height:100%!important;object-fit:cover}
 #scanner-container img{display:none}
 
+/* ── Modal de registro manual (código no legible) ── */
+.modal-back{display:none;position:fixed;inset:0;z-index:9998;background:rgba(22,24,29,.45);align-items:center;justify-content:center;padding:18px}
+.modal-back.open{display:flex}
+.modal{background:var(--bg);border-radius:14px;padding:20px;width:100%;max-width:420px;box-shadow:0 18px 48px rgba(0,0,0,.22)}
+.modal-title{font-size:17px;font-weight:900}
+.modal-sub{font-size:12px;color:var(--sub);margin:4px 0 16px}
+.modal-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ok);color:#052e13;font-size:12px;font-weight:700;padding:9px 16px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99;white-space:nowrap;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 </style>
@@ -153,6 +161,25 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
     <div class="btn-row">
       <button class="btn btn-ok" id="btn-validate" onclick="onValidate()">✅ Validar</button>
       <button class="btn btn-danger" onclick="onShortage()">⚠️ No se puede completar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="manual-modal">
+  <div class="modal">
+    <div class="modal-title">Registrar producto</div>
+    <div class="modal-sub">Escribe el código y la cantidad recibida.</div>
+    <div class="field">
+      <label for="manual-code">Código de producto (SKU)</label>
+      <input id="manual-code" placeholder="Ej. 1001" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="manual-qty">Cantidad</label>
+      <input id="manual-qty" type="number" min="0" step="any" value="1" inputmode="decimal">
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-outline" onclick="closeManualEntry()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitManualEntry()">Registrar</button>
     </div>
   </div>
 </div>
@@ -396,21 +423,47 @@ function scanForCurrentPicking() {
   openScanner(async (code) => { await processScannedCode(code); });
 }
 
-/* Entrada manual: cuando la etiqueta está dañada o el código no se puede leer con la cámara */
+/* ── Entrada manual: cuando la etiqueta está dañada o el código no se
+      puede leer con la cámara. Se escribe el SKU (o el código de barras)
+      y la cantidad recibida. ── */
 function manualEntry() {
   if (!currentPicking) return;
-  const code = prompt('Escribe el código de barras o SKU del producto:');
-  if (code === null) return; /* canceló */
-  const trimmed = code.trim();
-  if (!trimmed) return;
-  processScannedCode(trimmed);
+  const codeEl = document.getElementById('manual-code');
+  const qtyEl = document.getElementById('manual-qty');
+  codeEl.value = '';
+  qtyEl.value = '1';
+  /* El ejemplo del placeholder sale del propio albarán, así el almacenista
+     ve el formato real de los códigos que tiene delante. */
+  const sample = (currentPicking.move_lines.find(m => m.default_code) || {}).default_code;
+  codeEl.placeholder = sample ? 'Ej. ' + sample : 'Ej. 1001';
+  document.getElementById('manual-modal').classList.add('open');
+  setTimeout(() => codeEl.focus(), 50);
 }
 
-async function processScannedCode(code) {
-  const line = currentPicking.move_lines.find(m => m.barcode === code || m.default_code === code);
+function closeManualEntry() {
+  document.getElementById('manual-modal').classList.remove('open');
+}
+
+async function submitManualEntry() {
+  const code = document.getElementById('manual-code').value.trim();
+  if (!code) { toast('⚠️ Escribe el código del producto', 'warn'); return; }
+  const qty = parseFloat(document.getElementById('manual-qty').value);
+  if (!isFinite(qty) || qty <= 0) { toast('⚠️ Cantidad inválida', 'warn'); return; }
+  closeManualEntry();
+  await processScannedCode(code, qty);
+}
+
+/* Comparación tolerante: ignora mayúsculas/minúsculas y espacios sobrantes,
+   porque el código se escribe a mano. */
+function sameCode(a, b) {
+  return !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+}
+
+async function processScannedCode(code, qty = 1) {
+  const line = currentPicking.move_lines.find(m => sameCode(m.barcode, code) || sameCode(m.default_code, code));
   if (!line) { toast('⚠️ Ese código no pertenece a este albarán', 'warn'); return; }
   if (line.is_complete) { toast('ℹ️ ' + line.product_name + ' ya está completo', 'info'); return; }
-  await registerScan(line.product_id, 1);
+  await registerScan(line.product_id, qty);
 }
 
 async function registerScan(productId, qty) {
@@ -471,6 +524,17 @@ async function onShortage() {
     goTo('scr-list');
   }
 }
+
+/* ── Atajos del modal de registro manual ── */
+document.getElementById('manual-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'manual-modal') closeManualEntry(); /* clic fuera de la tarjeta */
+});
+['manual-code', 'manual-qty'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); submitManualEntry(); }
+    if (e.key === 'Escape') closeManualEntry();
+  });
+});
 
 /* ═══════════════════════════════════════════════════════════════
    INICIO
