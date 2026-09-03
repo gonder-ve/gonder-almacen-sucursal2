@@ -41,7 +41,9 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 
 .btn{border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
 .btn-primary{background:var(--accent);color:#111}
+.btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.validate-hint{font-size:11px;color:var(--sub);text-align:center;margin-top:-4px}
 .btn-outline{background:none;border:1.5px solid var(--line);color:var(--text)}
 .btn-danger{background:none;border:1.5px solid var(--err);color:var(--err)}
 .btn-ok{background:var(--ok);color:#052e13}
@@ -162,6 +164,7 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
       <button class="btn btn-ok" id="btn-validate" onclick="onValidate()">✅ Validar</button>
       <button class="btn btn-danger" onclick="onShortage()">⚠️ No se puede completar</button>
     </div>
+    <div class="validate-hint" id="validate-hint"></div>
   </div>
 </div>
 
@@ -379,7 +382,20 @@ function renderDetail() {
       <span class="line-done-badge">${m.is_complete ? '✅' : ''}</span>
     </div>`).join('');
 
-  document.getElementById('btn-validate').disabled = false;
+  /* Validar solo se habilita cuando TODOS los productos están completos.
+     Para cerrar un albarán incompleto está el botón rojo "No se puede
+     completar", que es el camino explícito para el faltante. */
+  const btn = document.getElementById('btn-validate');
+  const hint = document.getElementById('validate-hint');
+  const faltan = Math.max(0, p.total_demanded - p.total_done);
+  btn.disabled = !p.is_fully_scanned;
+  if (p.is_fully_scanned) {
+    btn.title = '';
+    hint.textContent = '';
+  } else {
+    btn.title = 'Escanea todos los productos para poder validar';
+    hint.textContent = `Faltan ${fmtQty(faltan)} unidad(es) por escanear para poder validar`;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -510,8 +526,11 @@ async function registerScan(productId, qty) {
 async function onValidate() {
   const p = currentPicking;
   if (!p) return;
+  /* Doble seguro: el botón ya está deshabilitado, pero si por lo que sea
+     se llega aquí con el albarán incompleto, no se valida. */
   if (!p.is_fully_scanned) {
-    if (!confirm('Aún faltan unidades por escanear. ¿Validar de todos modos? Se generará una entrega parcial (backorder).')) return;
+    toast('⚠️ Faltan productos por escanear', 'warn');
+    return;
   }
   const payload = { operator_name: CONFIG.operatorName, force_partial: true };
   try {
