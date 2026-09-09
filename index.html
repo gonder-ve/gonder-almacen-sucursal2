@@ -22,7 +22,7 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 #app{min-height:100dvh;display:flex;flex-direction:column}
 
 .hdr{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 14px;display:flex;align-items:center;gap:10px;padding-top:max(12px,env(safe-area-inset-top));flex-shrink:0}
-.hdr-logo{width:34px;height:34px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;line-height:1;color:#111;flex-shrink:0}
+.hdr-logo{width:34px;height:34px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;line-height:1;color:#111;flex-shrink:0;cursor:pointer}
 .hdr-title{flex:1;min-width:0}
 .hdr-name{font-size:14px;font-weight:800}
 .hdr-sub{font-size:10px;color:var(--sub)}
@@ -60,6 +60,15 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 .empty{text-align:center;padding:40px 20px;color:var(--sub);font-size:13px}
 .loading{text-align:center;padding:40px 20px;color:var(--sub);font-size:13px}
 
+/* ── Menú de módulos ── */
+.mod-card{display:flex;align-items:center;gap:12px;cursor:pointer}
+.mod-card:active{border-color:var(--accent)}
+.mod-icon{width:40px;height:40px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.mod-name{font-size:15px;font-weight:800}
+.mod-meta{font-size:11px;color:var(--sub);margin-top:3px}
+.mod-meta.alert{color:var(--warn);font-weight:700}
+.scr-title{font-size:13px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.04em}
+
 .det-hdr{display:flex;align-items:center;gap:8px}
 .det-name{font-size:16px;font-weight:900;flex:1}
 .det-partner{font-size:12px;color:var(--sub)}
@@ -77,6 +86,20 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 .line-qty.missing{color:var(--warn)}
 .line-done-badge{font-size:16px}
 
+/* ── Conteo de inventario ── */
+.ct-card{cursor:pointer}
+.ct-card:active{border-color:var(--accent)}
+.ct-card.diff{border-color:var(--err)}
+.ct-card.done{border-color:var(--ok)}
+.ct-name{font-size:13px;font-weight:700}
+.ct-code{font-size:10px;color:var(--sub);margin-top:2px}
+.ct-state{font-size:11px;margin-top:5px;font-weight:700}
+.ct-state.pend{color:var(--warn)}
+.ct-state.ok{color:var(--ok)}
+.ct-state.diff{color:var(--err)}
+.ct-tag{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:2px 7px;background:var(--panel2);color:var(--sub)}
+.ct-tag.diaria{background:var(--accent);color:#111}
+
 .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
 #scr-scanner{display:none;position:fixed;inset:0;z-index:9999;background:#000;flex-direction:column}
@@ -88,7 +111,7 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 #scanner-container video{width:100%!important;height:100%!important;object-fit:cover}
 #scanner-container img{display:none}
 
-/* ── Modal de registro manual (código no legible) ── */
+/* ── Modales ── */
 .modal-back{display:none;position:fixed;inset:0;z-index:9998;background:rgba(22,24,29,.45);align-items:center;justify-content:center;padding:18px}
 .modal-back.open{display:flex}
 .modal{background:var(--bg);border-radius:14px;padding:20px;width:100%;max-width:420px;box-shadow:0 18px 48px rgba(0,0,0,.22)}
@@ -113,7 +136,7 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 
 <div id="app">
   <div class="hdr">
-    <div class="hdr-logo">📦</div>
+    <div class="hdr-logo" onclick="goHome()" title="Inicio">📦</div>
     <div class="hdr-title">
       <div class="hdr-name">GONDER Sucursal 2</div>
       <div class="hdr-sub" id="hdr-sub">Sin configurar</div>
@@ -135,8 +158,42 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
     <div id="cfg-status" style="font-size:12px;color:var(--sub);text-align:center"></div>
   </div>
 
-  <!-- LISTA DE ALBARANES -->
+  <!-- MENÚ DE MÓDULOS -->
+  <div class="screen" id="scr-menu">
+    <div class="card mod-card" onclick="openModule('recepcion')">
+      <div class="mod-icon">📥</div>
+      <div style="flex:1;min-width:0">
+        <div class="mod-name">Recepciones</div>
+        <div class="mod-meta" id="menu-recepciones">Mercancía que llega</div>
+      </div>
+      <span class="pk-arrow">›</span>
+    </div>
+
+    <div class="card mod-card" onclick="openModule('entrega')">
+      <div class="mod-icon">📤</div>
+      <div style="flex:1;min-width:0">
+        <div class="mod-name">Entregas</div>
+        <div class="mod-meta" id="menu-entregas">Pedidos por despachar</div>
+      </div>
+      <span class="pk-arrow">›</span>
+    </div>
+
+    <div class="card mod-card" onclick="openCountLists()">
+      <div class="mod-icon">🔢</div>
+      <div style="flex:1;min-width:0">
+        <div class="mod-name">Conteo de inventario</div>
+        <div class="mod-meta" id="menu-conteo">Productos por chequear</div>
+      </div>
+      <span class="pk-arrow">›</span>
+    </div>
+
+    <button class="btn btn-outline btn-sm" style="margin-top:4px" onclick="loadSummary()">🔄 Actualizar</button>
+  </div>
+
+  <!-- LISTA DE ALBARANES (recepciones o entregas) -->
   <div class="screen" id="scr-list">
+    <button class="btn-icon" style="align-self:flex-start" onclick="goHome()">← Inicio</button>
+    <div class="scr-title" id="list-title">Entregas</div>
     <button class="btn btn-outline" onclick="loadPickings()">🔄 Actualizar</button>
     <div id="pk-list"></div>
   </div>
@@ -166,6 +223,26 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
     </div>
     <div class="validate-hint" id="validate-hint"></div>
   </div>
+
+  <!-- CONTEO: LISTAS -->
+  <div class="screen" id="scr-count-lists">
+    <button class="btn-icon" style="align-self:flex-start" onclick="goHome()">← Inicio</button>
+    <div class="scr-title">Conteo de inventario</div>
+    <button class="btn btn-outline" onclick="loadCountLists()">🔄 Actualizar</button>
+    <div id="ct-lists"></div>
+  </div>
+
+  <!-- CONTEO: PRODUCTOS DE UNA LISTA -->
+  <div class="screen" id="scr-count-items">
+    <button class="btn-icon" style="align-self:flex-start" onclick="openCountLists()">← Volver a las listas</button>
+    <div class="card">
+      <div class="det-name" id="ct-title">—</div>
+      <div class="det-partner" id="ct-sub">—</div>
+      <div class="progress-wrap"><div class="progress-bar" id="ct-progress" style="width:0%"></div></div>
+      <div class="progress-lbl" id="ct-progress-lbl">0 / 0 contados</div>
+    </div>
+    <div id="ct-items"></div>
+  </div>
 </div>
 
 <div class="modal-back" id="manual-modal">
@@ -187,6 +264,24 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
   </div>
 </div>
 
+<!-- Conteo a ciegas: aquí NUNCA se muestra lo que Odoo tiene a la mano.
+     El almacenista escribe lo que contó y la comparación la hace el
+     Worker; el resultado se ve después de registrar. -->
+<div class="modal-back" id="count-modal">
+  <div class="modal">
+    <div class="modal-title" id="count-modal-title">Contar producto</div>
+    <div class="modal-sub" id="count-modal-sub">—</div>
+    <div class="field">
+      <label for="count-qty">¿Cuántas unidades hay físicamente?</label>
+      <input id="count-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Cantidad contada">
+    </div>
+    <div class="modal-row">
+      <button class="btn btn-outline" onclick="closeCountModal()">Cancelar</button>
+      <button class="btn btn-primary" id="count-submit" onclick="submitCount()">Registrar conteo</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -201,17 +296,19 @@ if ('serviceWorker' in navigator) {
    CONFIGURACIÓN Y ESTADO
    ═══════════════════════════════════════════════════════════════
    El Worker y la API Key son fijos para toda la flota de teléfonos
-   de esta sucursal (se definen una sola vez aquí); lo único que
-   cambia por dispositivo/turno es el nombre del almacenista.
+   (se definen una sola vez aquí); lo único que cambia por
+   dispositivo/turno es el nombre del almacenista.
 
    Worker desplegado en la cuenta de Cloudflare de GONDER
-   (grupogonder@gmail.com) — restringido a la empresa
-   GONDER LISANDRO ALVARADO 2 (company_id=4). */
+   (grupogonder@gmail.com). */
 const WORKER_URL = 'https://gonder-warehouse-sucursal2.grupogonder-160.workers.dev';
 const API_KEY     = 'AKhnjkbFDD6Lw8dZIBx9HTAlpFj0';
 
 let CONFIG = JSON.parse(localStorage.getItem('gd_config_s2') || 'null');
 let currentPicking = null;
+let PICKING_MODE = 'entrega';   /* recepcion | entrega */
+let currentList = null;         /* lista de conteo abierta */
+let countingItem = null;        /* producto que se está contando */
 let QUEUE_KEY = 'gd_offline_queue_s2';
 
 function toast(msg, type = 'success') {
@@ -219,6 +316,7 @@ function toast(msg, type = 'success') {
   t.textContent = msg;
   const colors = { success:'var(--ok)', warn:'var(--warn)', error:'var(--err)', info:'var(--info)' };
   t.style.background = colors[type] || colors.success;
+  t.style.color = (type === 'warn') ? '#111' : '';
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 3000);
@@ -227,6 +325,12 @@ function toast(msg, type = 'success') {
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+}
+
+function goHome() {
+  if (!CONFIG) { goTo('scr-config'); return; }
+  goTo('scr-menu');
+  loadSummary();
 }
 
 function saveConfig() {
@@ -238,8 +342,7 @@ function saveConfig() {
   CONFIG = { workerUrl: WORKER_URL, apiKey: API_KEY, operatorName: op };
   localStorage.setItem('gd_config_s2', JSON.stringify(CONFIG));
   updateHdr();
-  goTo('scr-list');
-  loadPickings();
+  goHome();
 }
 
 function updateHdr() {
@@ -254,7 +357,7 @@ function makeSignal(ms) {
   const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal;
 }
 
-async function apiFetch(path, { method = 'GET', body } = {}) {
+async function apiFetch(path, { method = 'GET', body, timeout = 15000 } = {}) {
   const res = await fetch(CONFIG.workerUrl + path, {
     method,
     headers: {
@@ -263,7 +366,7 @@ async function apiFetch(path, { method = 'GET', body } = {}) {
       'X-Operator-Name': CONFIG.operatorName,
     },
     body: body ? JSON.stringify(body) : undefined,
-    signal: makeSignal(15000),
+    signal: makeSignal(timeout),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.ok === false) throw new Error(data.error || ('HTTP ' + res.status));
@@ -321,14 +424,46 @@ async function flushQueue() {
 window.addEventListener('online', flushQueue);
 
 /* ═══════════════════════════════════════════════════════════════
+   MENÚ — contadores de cada módulo
+   ═══════════════════════════════════════════════════════════════ */
+async function loadSummary() {
+  const rec = document.getElementById('menu-recepciones');
+  const ent = document.getElementById('menu-entregas');
+  const cnt = document.getElementById('menu-conteo');
+  try {
+    const s = await apiFetch('/summary');
+    rec.textContent = s.recepciones ? `${s.recepciones} albarán(es) por recibir` : 'Nada pendiente por recibir';
+    ent.textContent = s.entregas ? `${s.entregas} albarán(es) por preparar` : 'Nada pendiente por despachar';
+    const pend = s.conteo ? s.conteo.pendientes : 0;
+    cnt.textContent = pend ? `${pend} producto(s) por contar` : 'Sin productos pendientes';
+    cnt.className = pend ? 'mod-meta alert' : 'mod-meta';
+  } catch (e) {
+    rec.textContent = 'Mercancía que llega';
+    ent.textContent = 'Pedidos por despachar';
+    cnt.textContent = 'Productos por chequear';
+    cnt.className = 'mod-meta';
+  }
+}
+
+function openModule(mode) {
+  PICKING_MODE = mode;
+  document.getElementById('list-title').textContent = (mode === 'recepcion') ? 'Recepciones' : 'Entregas';
+  goTo('scr-list');
+  loadPickings();
+}
+
+/* ═══════════════════════════════════════════════════════════════
    LISTA DE ALBARANES
    ═══════════════════════════════════════════════════════════════ */
 async function loadPickings() {
   const el = document.getElementById('pk-list');
   el.innerHTML = '<div class="loading">Cargando…</div>';
+  const vacio = (PICKING_MODE === 'recepcion')
+    ? 'No hay recepciones listas para recibir.'
+    : 'No hay albaranes listos para preparar.';
   try {
-    const { pickings } = await apiFetch('/pickings');
-    if (!pickings.length) { el.innerHTML = '<div class="empty">No hay albaranes listos para preparar.</div>'; return; }
+    const { pickings } = await apiFetch('/pickings?tipo=' + PICKING_MODE);
+    if (!pickings.length) { el.innerHTML = `<div class="empty">${vacio}</div>`; return; }
     el.innerHTML = pickings.map(p => `
       <div class="card pk-card" style="margin-bottom:8px" onclick="openPicking(${p.id})">
         <div style="flex:1;min-width:0">
@@ -560,7 +695,158 @@ async function onShortage() {
   }
 }
 
-/* ── Atajos del modal de registro manual ── */
+/* ═══════════════════════════════════════════════════════════════
+   CONTEO DE INVENTARIO
+   ═══════════════════════════════════════════════════════════════
+   Las listas nacen solas a las 8:00 am (lo vendido el día anterior)
+   o a pedido desde el bot de Telegram. Aquí solo se cuentan.
+
+   El conteo es A CIEGAS: la app nunca recibe la existencia de Odoo
+   de un producto sin contar. Se manda lo contado, el Worker compara
+   y devuelve el resultado. Por eso el registro necesita conexión y
+   no entra en la cola offline: sin Odoo no hay con qué comparar.
+   ═══════════════════════════════════════════════════════════════ */
+function openCountLists() {
+  goTo('scr-count-lists');
+  loadCountLists();
+}
+
+async function loadCountLists() {
+  const el = document.getElementById('ct-lists');
+  el.innerHTML = '<div class="loading">Cargando…</div>';
+  try {
+    const { lists } = await apiFetch('/count/lists');
+    if (!lists.length) {
+      el.innerHTML = '<div class="empty">No hay listas de conteo abiertas.<br><br>La lista de lo vendido ayer sale sola a las 8:00 am. También puedes pedirle una al bot de Telegram.</div>';
+      return;
+    }
+    el.innerHTML = lists.map(l => {
+      const dif = l.diffs ? `<span class="ct-state diff"> · ${l.diffs} con diferencia</span>` : '';
+      const listo = l.pending === 0;
+      return `
+      <div class="card ct-card ${listo ? 'done' : ''}" style="margin-bottom:8px" onclick="openCountList('${l.id}')">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div class="pk-name">${l.title}</div>
+            <div class="pk-meta" style="margin-top:5px">
+              <span class="ct-tag ${l.kind === 'diaria' ? 'diaria' : ''}">${l.kind === 'diaria' ? 'Automática' : (l.kind === 'categoria' ? 'Categoría' : 'Búsqueda')}</span>
+            </div>
+            <div class="ct-state ${listo ? 'ok' : 'pend'}">${l.done} / ${l.total} contados${dif}</div>
+          </div>
+          <span class="pk-arrow">›</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty">❌ ${e.message}</div>`;
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function openCountList(id, silent) {
+  if (!silent) goTo('scr-count-items');
+  try {
+    const { list } = await apiFetch('/count/list/' + id);
+    currentList = list;
+    renderCountList();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+function renderCountList() {
+  const l = currentList;
+  document.getElementById('ct-title').textContent = l.title;
+  const extra = l.truncated ? ' · lista recortada al tope' : '';
+  document.getElementById('ct-sub').textContent =
+    `${l.kind === 'diaria' ? 'Generada automáticamente' : 'Pedida por ' + (l.created_by || 'Telegram')}${extra}`;
+  const pct = l.total ? Math.round(100 * l.done / l.total) : 0;
+  document.getElementById('ct-progress').style.width = pct + '%';
+  document.getElementById('ct-progress-lbl').textContent =
+    `${l.done} / ${l.total} contados` + (l.diffs ? ` · ${l.diffs} con diferencia` : '');
+
+  document.getElementById('ct-items').innerHTML = l.items.map(i => {
+    const c = i.counted;
+    let estado, clase;
+    if (!c) {
+      estado = `<div class="ct-state pend">Pendiente de contar</div>`;
+      clase = '';
+    } else if (c.diff === 0) {
+      estado = `<div class="ct-state ok">✅ Cuadra · contado ${fmtQty(c.qty)}</div>`;
+      clase = 'done';
+    } else {
+      estado = `<div class="ct-state diff">⚠️ Contado ${fmtQty(c.qty)} · sistema ${fmtQty(c.odoo_qty)} · ${c.diff > 0 ? '+' : ''}${fmtQty(c.diff)}</div>`;
+      clase = 'diff';
+    }
+    const vendido = (i.sold_qty !== null && i.sold_qty !== undefined)
+      ? ` · vendido ayer: ${fmtQty(i.sold_qty)}` : '';
+    const quien = c ? `<div class="pk-meta">Contó ${c.operator}${c.recounts ? ' · ' + c.recounts + ' recuento(s)' : ''}</div>` : '';
+    return `
+      <div class="card ct-card ${clase}" style="margin-bottom:8px" onclick="openCountModal(${i.product_id})">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div class="ct-name">${i.name}</div>
+            <div class="ct-code">${i.code || 'sin código'}${vendido}</div>
+            ${estado}
+            ${quien}
+          </div>
+          <span class="pk-arrow">›</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openCountModal(productId) {
+  const item = currentList.items.find(i => i.product_id === productId);
+  if (!item) return;
+  countingItem = item;
+  const yaContado = !!item.counted;
+  document.getElementById('count-modal-title').textContent = yaContado ? 'Recontar producto' : 'Contar producto';
+  document.getElementById('count-modal-sub').innerHTML = yaContado
+    ? `${item.name}<br>${item.code || 'sin código'} · ya contado, queda el registro de los dos conteos`
+    : `${item.name}<br>${item.code || 'sin código'}`;
+  const input = document.getElementById('count-qty');
+  input.value = '';
+  document.getElementById('count-modal').classList.add('open');
+  setTimeout(() => input.focus(), 50);
+}
+
+function closeCountModal() {
+  document.getElementById('count-modal').classList.remove('open');
+  countingItem = null;
+}
+
+async function submitCount() {
+  if (!countingItem || !currentList) return;
+  const raw = document.getElementById('count-qty').value.trim();
+  if (raw === '') { toast('⚠️ Escribe cuántas unidades contaste', 'warn'); return; }
+  const qty = parseFloat(raw);
+  if (!isFinite(qty) || qty < 0) { toast('⚠️ Cantidad inválida', 'warn'); return; }
+
+  const btn = document.getElementById('count-submit');
+  const item = countingItem;
+  btn.disabled = true;
+  try {
+    const data = await apiFetch(`/count/list/${currentList.id}/register`, {
+      method: 'POST',
+      body: { product_id: item.product_id, qty, operator_name: CONFIG.operatorName },
+    });
+    currentList = data.list;
+    closeCountModal();
+    renderCountList();
+    const r = data.result;
+    if (r.match) toast('✅ Cuadra con el sistema');
+    else toast(`⚠️ Diferencia de ${r.diff > 0 ? '+' : ''}${fmtQty(r.diff)} — avisado`, 'error');
+  } catch (e) {
+    /* Sin conexión no se puede comparar contra Odoo, así que no se
+       guarda a medias: se le pide al almacenista que reintente. */
+    toast('❌ ' + e.message + ' — intenta de nuevo', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ── Atajos de los modales ── */
 document.getElementById('manual-modal').addEventListener('click', (e) => {
   if (e.target.id === 'manual-modal') closeManualEntry(); /* clic fuera de la tarjeta */
 });
@@ -569,6 +855,14 @@ document.getElementById('manual-modal').addEventListener('click', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); submitManualEntry(); }
     if (e.key === 'Escape') closeManualEntry();
   });
+});
+
+document.getElementById('count-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'count-modal') closeCountModal();
+});
+document.getElementById('count-qty').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); submitCount(); }
+  if (e.key === 'Escape') closeCountModal();
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -582,8 +876,8 @@ document.getElementById('manual-modal').addEventListener('click', (e) => {
     localStorage.setItem('gd_config_s2', JSON.stringify(CONFIG));
     document.getElementById('cfg-op').value = CONFIG.operatorName;
     updateHdr();
-    goTo('scr-list');
-    loadPickings();
+    goTo('scr-menu');
+    loadSummary();
     pingWorker();
     flushQueue();
   } else {
