@@ -255,7 +255,7 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
     </div>
     <div class="field">
       <label for="manual-qty">Cantidad</label>
-      <input id="manual-qty" type="number" min="0" step="any" value="1" inputmode="decimal">
+      <input id="manual-qty" type="text" inputmode="decimal" autocomplete="off" value="1">
     </div>
     <div class="modal-row">
       <button class="btn btn-outline" onclick="closeManualEntry()">Cancelar</button>
@@ -273,7 +273,7 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
     <div class="modal-sub" id="count-modal-sub">—</div>
     <div class="field">
       <label for="count-qty">¿Cuántas unidades hay físicamente?</label>
-      <input id="count-qty" type="number" min="0" step="any" inputmode="decimal" placeholder="Cantidad contada">
+      <input id="count-qty" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej. 16 o 16,5">
     </div>
     <div class="modal-row">
       <button class="btn btn-outline" onclick="closeCountModal()">Cancelar</button>
@@ -598,7 +598,7 @@ function closeManualEntry() {
 async function submitManualEntry() {
   const code = document.getElementById('manual-code').value.trim();
   if (!code) { toast('⚠️ Escribe el código del producto', 'warn'); return; }
-  const qty = parseFloat(document.getElementById('manual-qty').value);
+  const qty = parseCantidad(document.getElementById('manual-qty').value);
   if (!isFinite(qty) || qty <= 0) { toast('⚠️ Cantidad inválida', 'warn'); return; }
   closeManualEntry();
   await processScannedCode(code, qty);
@@ -613,6 +613,20 @@ function sameCode(a, b) {
 /* Redondeo de presentación: evita mostrar 3.0000000001 en los avisos */
 function fmtQty(n) {
   return Number(Number(n).toFixed(3));
+}
+
+/* ── Cantidades escritas a mano ──
+   El teclado en español usa la coma como separador decimal, y un
+   <input type="number"> descarta ese valor en silencio: el almacenista
+   escribe 16,5 y el campo le queda vacío sin decir por qué. Por eso los
+   campos de cantidad son de texto y la conversión se hace aquí.
+   También se soporta el formato 1.234,5 por si alguien lo escribe así. */
+function parseCantidad(raw) {
+  let s = String(raw == null ? '' : raw).trim();
+  if (s === '') return NaN;
+  if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '');
+  s = s.replace(',', '.');
+  return Number(s);
 }
 
 async function processScannedCode(code, qty = 1) {
@@ -820,7 +834,7 @@ async function submitCount() {
   if (!countingItem || !currentList) return;
   const raw = document.getElementById('count-qty').value.trim();
   if (raw === '') { toast('⚠️ Escribe cuántas unidades contaste', 'warn'); return; }
-  const qty = parseFloat(raw);
+  const qty = parseCantidad(raw);
   if (!isFinite(qty) || qty < 0) { toast('⚠️ Cantidad inválida', 'warn'); return; }
 
   const btn = document.getElementById('count-submit');
