@@ -119,6 +119,13 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 .modal-sub{font-size:12px;color:var(--sub);margin:4px 0 16px}
 .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
 
+/* Campo de cantidad con la unidad de medida pegada a la derecha */
+.qty-wrap{display:flex;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:0 12px}
+.qty-wrap:focus-within{border-color:var(--accent)}
+.qty-wrap input{flex:1;min-width:0;border:none;background:transparent;padding:11px 0;font-size:15px;color:var(--text);outline:none}
+.qty-uom{font-size:13px;font-weight:800;color:var(--sub);padding-left:8px;margin-left:8px;border-left:1px solid var(--line);white-space:nowrap}
+.qty-hint{font-size:11px;color:var(--warn);margin-top:6px;line-height:1.5;font-weight:600}
+
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ok);color:#052e13;font-size:12px;font-weight:700;padding:9px 16px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99;white-space:nowrap;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 </style>
@@ -242,6 +249,9 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
       <div class="progress-lbl" id="ct-progress-lbl">0 / 0 contados</div>
     </div>
     <div id="ct-items"></div>
+
+    <button class="btn btn-ok" id="btn-finish-count" onclick="onFinishCount()">✅ Finalizar conteo</button>
+    <div class="validate-hint" id="finish-hint"></div>
   </div>
 </div>
 
@@ -272,8 +282,12 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
     <div class="modal-title" id="count-modal-title">Contar producto</div>
     <div class="modal-sub" id="count-modal-sub">—</div>
     <div class="field">
-      <label for="count-qty">¿Cuántas unidades hay físicamente?</label>
-      <input id="count-qty" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej. 16 o 16,5">
+      <label for="count-qty" id="count-qty-label">¿Cuántas unidades hay físicamente?</label>
+      <div class="qty-wrap">
+        <input id="count-qty" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej. 16 o 16,5">
+        <span class="qty-uom" id="count-uom">unidad</span>
+      </div>
+      <div class="qty-hint" id="count-uom-hint"></div>
     </div>
     <div class="modal-row">
       <button class="btn btn-outline" onclick="closeCountModal()">Cancelar</button>
@@ -779,21 +793,37 @@ function renderCountList() {
   document.getElementById('ct-progress-lbl').textContent =
     `${l.done} / ${l.total} contados` + (l.diffs ? ` · ${l.diffs} con diferencia` : '');
 
+  /* Mismo criterio que el botón Validar de los albaranes: una lista a
+     medias no se cierra. El descuadre que se busca puede estar justo en
+     lo que quedó sin contar. */
+  const faltan = Math.max(0, l.total - l.done);
+  const btnFin = document.getElementById('btn-finish-count');
+  const hintFin = document.getElementById('finish-hint');
+  btnFin.disabled = faltan > 0;
+  if (faltan > 0) {
+    btnFin.title = 'Cuenta todos los productos para poder cerrar la lista';
+    hintFin.textContent = `Faltan ${faltan} producto(s) por contar para poder finalizar`;
+  } else {
+    btnFin.title = '';
+    hintFin.textContent = '';
+  }
+
   document.getElementById('ct-items').innerHTML = l.items.map(i => {
     const c = i.counted;
+    const um = infoUnidad(i.uom).etiqueta;
     let estado, clase;
     if (!c) {
-      estado = `<div class="ct-state pend">Pendiente de contar</div>`;
+      estado = `<div class="ct-state pend">Pendiente de contar · se cuenta en ${um}</div>`;
       clase = '';
     } else if (c.diff === 0) {
-      estado = `<div class="ct-state ok">✅ Cuadra · contado ${fmtQty(c.qty)}</div>`;
+      estado = `<div class="ct-state ok">✅ Cuadra · contado ${fmtQty(c.qty)} ${um}</div>`;
       clase = 'done';
     } else {
-      estado = `<div class="ct-state diff">⚠️ Contado ${fmtQty(c.qty)} · sistema ${fmtQty(c.odoo_qty)} · ${c.diff > 0 ? '+' : ''}${fmtQty(c.diff)}</div>`;
+      estado = `<div class="ct-state diff">⚠️ Contado ${fmtQty(c.qty)} · sistema ${fmtQty(c.odoo_qty)} ${um} · ${c.diff > 0 ? '+' : ''}${fmtQty(c.diff)}</div>`;
       clase = 'diff';
     }
     const vendido = (i.sold_qty !== null && i.sold_qty !== undefined)
-      ? ` · vendido ayer: ${fmtQty(i.sold_qty)}` : '';
+      ? ` · vendido ayer: ${fmtQty(i.sold_qty)} ${um}` : '';
     const quien = c ? `<div class="pk-meta">Contó ${c.operator}${c.recounts ? ' · ' + c.recounts + ' recuento(s)' : ''}</div>` : '';
     return `
       <div class="card ct-card ${clase}" style="margin-bottom:8px" onclick="openCountModal(${i.product_id})">
@@ -810,15 +840,61 @@ function renderCountList() {
   }).join('');
 }
 
+/* ── Unidad de medida del producto ──
+   La unidad viene de Odoo, la misma contra la que se compara el conteo,
+   así que la app nunca puede pedir una cosa y comparar contra otra.
+   Se le dice al almacenista en qué unidad contar: una cerámica se cuenta
+   en m², no en piezas ni en cajas, y ahí es donde se equivoca. */
+const UNIDADES = {
+  'unidad': { plural: 'unidades', femenino: true },
+  'unidades': { plural: 'unidades', femenino: true },
+  'units': { plural: 'unidades', femenino: true },
+  'unit': { plural: 'unidades', femenino: true },
+  'm²': { plural: 'm²', largo: 'metros cuadrados' },
+  'm2': { plural: 'm²', largo: 'metros cuadrados' },
+  'mt': { plural: 'metros', largo: 'metros' },
+  'm': { plural: 'metros', largo: 'metros' },
+  'metros': { plural: 'metros', largo: 'metros' },
+  'kg': { plural: 'kilos', largo: 'kilos' },
+  'kilos': { plural: 'kilos', largo: 'kilos' },
+  'saco': { plural: 'sacos', largo: 'sacos' },
+  'sacos': { plural: 'sacos', largo: 'sacos' },
+  'lt': { plural: 'litros', largo: 'litros' },
+  'l': { plural: 'litros', largo: 'litros' },
+  'litros': { plural: 'litros', largo: 'litros' },
+};
+
+function infoUnidad(uom) {
+  const limpia = String(uom || '').trim() || 'unidad';
+  const def = UNIDADES[limpia.toLowerCase()];
+  if (def) return { etiqueta: limpia, ...def };
+  /* Unidad que no está en la tabla: se usa tal cual, con una pregunta
+     que suena bien con cualquier palabra. */
+  return { etiqueta: limpia, plural: limpia, largo: limpia, generica: true };
+}
+
 function openCountModal(productId) {
   const item = currentList.items.find(i => i.product_id === productId);
   if (!item) return;
   countingItem = item;
   const yaContado = !!item.counted;
+  const u = infoUnidad(item.uom);
+
   document.getElementById('count-modal-title').textContent = yaContado ? 'Recontar producto' : 'Contar producto';
+  const vendido = (item.sold_qty !== null && item.sold_qty !== undefined)
+    ? ` · vendido ayer: ${fmtQty(item.sold_qty)} ${u.etiqueta}` : '';
   document.getElementById('count-modal-sub').innerHTML = yaContado
-    ? `${item.name}<br>${item.code || 'sin código'} · ya contado, queda el registro de los dos conteos`
-    : `${item.name}<br>${item.code || 'sin código'}`;
+    ? `${item.name}<br>${item.code || 'sin código'}${vendido}<br>Ya contado, queda el registro de los dos conteos`
+    : `${item.name}<br>${item.code || 'sin código'}${vendido}`;
+
+  document.getElementById('count-qty-label').textContent = u.femenino
+    ? '¿Cuántas unidades hay físicamente?'
+    : (u.generica ? `¿Cuánto hay físicamente, en ${u.etiqueta}?` : `¿Cuántos ${u.plural} hay físicamente?`);
+  document.getElementById('count-uom').textContent = u.etiqueta;
+  document.getElementById('count-uom-hint').textContent = u.femenino
+    ? ''
+    : `Este producto se cuenta en ${u.largo}, no en piezas ni en cajas.`;
+
   const input = document.getElementById('count-qty');
   input.value = '';
   document.getElementById('count-modal').classList.add('open');
@@ -857,6 +933,25 @@ async function submitCount() {
     toast('❌ ' + e.message + ' — intenta de nuevo', 'error');
   } finally {
     btn.disabled = false;
+  }
+}
+
+async function onFinishCount() {
+  if (!currentList) return;
+  const faltan = Math.max(0, currentList.total - currentList.done);
+  /* Doble seguro: el botón ya está deshabilitado, pero si por lo que sea
+     se llega aquí con la lista incompleta, no se cierra. */
+  if (faltan > 0) { toast(`⚠️ Faltan ${faltan} producto(s) por contar`, 'warn'); return; }
+  if (!confirm('¿Cerrar esta lista de conteo? Ya no aparecerá en la app.')) return;
+  try {
+    await apiFetch(`/count/list/${currentList.id}/close`, {
+      method: 'POST',
+      body: { operator_name: CONFIG.operatorName },
+    });
+    toast('✅ Conteo terminado');
+    openCountLists();
+  } catch (e) {
+    toast('❌ ' + e.message, 'error');
   }
 }
 
