@@ -99,6 +99,9 @@ html,body{height:100%;background:var(--bg);color:var(--text)}
 .ct-state.diff{color:var(--err)}
 .ct-tag{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:2px 7px;background:var(--panel2);color:var(--sub)}
 .ct-tag.diaria{background:var(--accent);color:#111}
+.ct-tag.fin{background:var(--ok);color:#052e13}
+.ct-card.cerrada{opacity:.75}
+.ct-sep{font-size:11px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px}
 
 .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
@@ -748,27 +751,48 @@ async function loadCountLists() {
       el.innerHTML = '<div class="empty">No hay listas de conteo abiertas.<br><br>La lista de lo vendido ayer sale sola a las 8:00 am. También puedes pedirle una al bot de Telegram.</div>';
       return;
     }
-    el.innerHTML = lists.map(l => {
+    /* Las finalizadas no se borran: quedan abajo, en solo lectura, para
+       poder revisar qué se contó y quién lo contó. */
+    const tarjeta = l => {
       const dif = l.diffs ? `<span class="ct-state diff"> · ${l.diffs} con diferencia</span>` : '';
       const listo = l.pending === 0;
+      const fin = l.closed_at
+        ? `<span class="ct-tag fin">Finalizada</span>`
+        : '';
+      const cerro = l.closed_at
+        ? `<div class="pk-meta">Finalizó ${l.closed_by || '—'} · ${fmtFecha(l.closed_at)}</div>`
+        : '';
       return `
-      <div class="card ct-card ${listo ? 'done' : ''}" style="margin-bottom:8px" onclick="openCountList('${l.id}')">
+      <div class="card ct-card ${listo ? 'done' : ''} ${l.closed_at ? 'cerrada' : ''}" style="margin-bottom:8px" onclick="openCountList('${l.id}')">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="flex:1;min-width:0">
             <div class="pk-name">${l.title}</div>
             <div class="pk-meta" style="margin-top:5px">
               <span class="ct-tag ${l.kind === 'diaria' ? 'diaria' : ''}">${l.kind === 'diaria' ? 'Automática' : (l.kind === 'categoria' ? 'Categoría' : 'Búsqueda')}</span>
+              ${fin}
             </div>
             <div class="ct-state ${listo ? 'ok' : 'pend'}">${l.done} / ${l.total} contados${dif}</div>
+            ${cerro}
           </div>
           <span class="pk-arrow">›</span>
         </div>
       </div>`;
-    }).join('');
+    };
+    const abiertas = lists.filter(l => !l.closed_at);
+    const cerradas = lists.filter(l => l.closed_at);
+    el.innerHTML =
+      (abiertas.length ? abiertas.map(tarjeta).join('') : '<div class="empty">No hay listas pendientes por contar.</div>') +
+      (cerradas.length ? '<div class="ct-sep">Finalizadas</div>' + cerradas.map(tarjeta).join('') : '');
   } catch (e) {
     el.innerHTML = `<div class="empty">❌ ${e.message}</div>`;
     toast('Error: ' + e.message, 'error');
   }
+}
+
+function fmtFecha(iso) {
+  try {
+    return new Date(iso).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' });
+  } catch (e) { return ''; }
 }
 
 async function openCountList(id, silent) {
@@ -799,8 +823,11 @@ function renderCountList() {
   const faltan = Math.max(0, l.total - l.done);
   const btnFin = document.getElementById('btn-finish-count');
   const hintFin = document.getElementById('finish-hint');
+  btnFin.style.display = l.closed_at ? 'none' : '';
   btnFin.disabled = faltan > 0;
-  if (faltan > 0) {
+  if (l.closed_at) {
+    hintFin.textContent = `Lista finalizada por ${l.closed_by || '—'} el ${fmtFecha(l.closed_at)}. Solo lectura.`;
+  } else if (faltan > 0) {
     btnFin.title = 'Cuenta todos los productos para poder cerrar la lista';
     hintFin.textContent = `Faltan ${faltan} producto(s) por contar para poder finalizar`;
   } else {
@@ -874,6 +901,10 @@ function infoUnidad(uom) {
 }
 
 function openCountModal(productId) {
+  if (currentList && currentList.closed_at) {
+    toast('ℹ️ Esta lista ya está finalizada', 'info');
+    return;
+  }
   const item = currentList.items.find(i => i.product_id === productId);
   if (!item) return;
   countingItem = item;
@@ -942,7 +973,7 @@ async function onFinishCount() {
   /* Doble seguro: el botón ya está deshabilitado, pero si por lo que sea
      se llega aquí con la lista incompleta, no se cierra. */
   if (faltan > 0) { toast(`⚠️ Faltan ${faltan} producto(s) por contar`, 'warn'); return; }
-  if (!confirm('¿Cerrar esta lista de conteo? Ya no aparecerá en la app.')) return;
+  if (!confirm('¿Finalizar esta lista de conteo? Quedará guardada en "Finalizadas" y ya no se podrá modificar.')) return;
   try {
     await apiFetch(`/count/list/${currentList.id}/close`, {
       method: 'POST',
